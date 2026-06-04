@@ -13,6 +13,9 @@ def pytest_configure(config):
         "markers", "needs_cuda: mark for tests that rely on a CUDA device"
     )
     config.addinivalue_line(
+        "markers", "needs_mlu: mark for tests that rely on an MLU device"
+    )
+    config.addinivalue_line(
         "markers", "needs_ffmpeg_cli: mark for tests that rely on ffmpeg"
     )
 
@@ -33,6 +36,7 @@ def pytest_collection_modifyitems(items):
         # 'needs_cuda' mark, and the ones with device == 'cpu' won't have the
         # mark.
         needs_cuda = item.get_closest_marker("needs_cuda") is not None
+        needs_mlu = item.get_closest_marker("needs_mlu") is not None
         needs_ffmpeg_cli = item.get_closest_marker("needs_ffmpeg_cli") is not None
         has_skip_marker = item.get_closest_marker("skip") is not None
 
@@ -67,6 +71,16 @@ def pytest_collection_modifyitems(items):
             # supposed to run the CUDA tests, so if CUDA isn't available on
             # those for whatever reason, we need to know.
             item.add_marker(pytest.mark.skip(reason="CUDA not available."))
+
+        mlu_available = hasattr(torch, "mlu") and torch.mlu.is_available()
+        if (
+            needs_mlu
+            and not mlu_available
+            and os.environ.get("FAIL_WITHOUT_MLU") is None
+        ):
+            # Skip MLU tests on non-MLU machines, similar to CUDA.
+            # If FAIL_WITHOUT_MLU is set, tests will fail (useful for CI).
+            item.add_marker(pytest.mark.skip(reason="MLU not available."))
 
         out_items.append(item)
 

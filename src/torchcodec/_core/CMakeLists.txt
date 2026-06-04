@@ -150,6 +150,10 @@ function(make_torchcodec_libraries
 	    list(APPEND core_sources CudaDeviceInterface.cpp BetaCudaDeviceInterface.cpp NVDECCache.cpp CUDACommon.cpp NVCUVIDRuntimeLoader.cpp color_conversion.cpp color_conversion.cu)
     endif()
 
+    if(ENABLE_MLU)
+        list(APPEND core_sources MluDeviceInterface.cpp)
+    endif()
+
     set(core_library_dependencies
         ${ffmpeg_target}
         ${TORCH_LIBRARIES}
@@ -161,6 +165,20 @@ function(make_torchcodec_libraries
         "${core_sources}"
         "${core_library_dependencies}"
     )
+
+    if(ENABLE_MLU)
+        # Add Neuware SDK include and library paths for MLU support.
+        # Set NEUWARE_DIR to point to your Neuware SDK installation, or pass it
+        # via -DNEUWARE_DIR=/path/to/neuware on the cmake command line.
+        set(NEUWARE_DIR "" CACHE PATH "Neuware SDK installation directory")
+        if(NEUWARE_DIR AND EXISTS "${NEUWARE_DIR}/include/cnrt.h")
+            target_include_directories(${core_library_name} PRIVATE "${NEUWARE_DIR}/include")
+            target_link_directories(${core_library_name} PRIVATE "${NEUWARE_DIR}/lib64")
+            target_link_libraries(${core_library_name} PRIVATE cnrt cncodec_v3 cndrv cndev)
+        else()
+            message(WARNING "Neuware SDK not found at ${NEUWARE_DIR}. MLU support will be skipped. Set NEUWARE_DIR to enable.")
+        endif()
+    endif()
 
     if(ENABLE_CUDA)
         # We define USE_CUDA to guard CUDA-specific code paths (e.g.
@@ -176,6 +194,10 @@ function(make_torchcodec_libraries
             target_compile_options(${core_library_name} PRIVATE
                 $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>)
         endif()
+    endif()
+
+    if(ENABLE_MLU)
+        target_compile_definitions(${core_library_name} PRIVATE USE_MLU)
     endif()
 
     # 2. Create libtorchcodec_custom_opsN.{ext}.

@@ -277,6 +277,8 @@ class VideoDecoder:
                 self._cpu_fallback._backend = "CUDA"
             else:
                 self._cpu_fallback._backend = "FFmpeg CUDA"
+        elif device.startswith("mlu"):
+            self._cpu_fallback._backend = "MLU"
         else:
             self._cpu_fallback._backend = "CPU"
 

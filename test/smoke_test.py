@@ -8,6 +8,7 @@ from test.utils import (
     assert_tensor_close_on_at_least,
     cuda_version_used_for_building_torch,
     needs_cuda,
+    needs_mlu,
 )
 
 from torchcodec import ffmpeg_major_version
@@ -196,6 +197,40 @@ class TestVideoDecoder:
             assert frame.shape == (3, HEIGHT, WIDTH)
             count += 1
         assert count == NUM_FRAMES
+
+    @needs_mlu
+    def test_mlu_decoding(self, tmp_path):
+        """Basic MLU hardware decoding smoke test.
+
+        Decodes a short video on MLU and compares the output against CPU
+        decoding. Hardware decoders may introduce slight pixel differences,
+        so we use a percentage-based tolerance comparison.
+        """
+        path, _ = _make_video_file(tmp_path, pixel_format="yuv420p")
+        decoder_mlu = VideoDecoder(path, device="mlu")
+        decoder_cpu = VideoDecoder(path, device="cpu")
+
+        # Single frame decoding
+        frame_mlu = decoder_mlu.get_frame_at(0)
+        frame_cpu = decoder_cpu.get_frame_at(0)
+        assert frame_mlu.data.shape == frame_cpu.data.shape
+
+        # Batch decoding
+        indices = [0, 1, 2, 4, 8]
+        frames_mlu = decoder_mlu.get_frames_at(indices)
+        frames_cpu = decoder_cpu.get_frames_at(indices)
+        assert frames_mlu.data.shape == frames_cpu.data.shape
+        assert frames_mlu.data.shape[0] == len(indices)
+
+        assert_tensor_close_on_at_least(
+            frames_mlu.data.cpu(), frames_cpu.data, percentage=95, atol=3
+        )
+
+        # Slice decoding
+        slice_mlu = decoder_mlu[3:8]
+        slice_cpu = decoder_cpu[3:8]
+        assert slice_mlu.data.shape == slice_cpu.data.shape
+        assert slice_mlu.data.shape[0] == 5
 
 
 class TestAudioDecoder:

@@ -47,6 +47,10 @@ def needs_cuda(test_item):
     return pytest.mark.needs_cuda(test_item)
 
 
+def needs_mlu(test_item):
+    return pytest.mark.needs_mlu(test_item)
+
+
 # Decorator for skipping ffmpeg tests when ffmpeg cli isn't available. The tests are
 # effectively marked to be skipped in pytest_collection_modifyitems() of
 # conftest.py
@@ -69,6 +73,7 @@ def all_supported_devices():
         "cpu",
         pytest.param("cuda", marks=pytest.mark.needs_cuda),
         pytest.param(_CUDA_FFMPEG_DEVICE_STR, marks=pytest.mark.needs_cuda),
+        pytest.param("mlu", marks=pytest.mark.needs_mlu),
     )
 
 
@@ -164,6 +169,20 @@ def assert_frames_equal(*args, **kwargs):
                 )
             else:
                 torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
+        elif args[0].device.type == "mlu":
+            # Move MLU tensors to CPU for comparison; hardware decoding may
+            # introduce slight differences, so use percentage-based comparison
+            # similar to CUDA.
+            decoded = args[0].cpu()
+            reference = args[1].cpu() if args[1].device.type == "mlu" else args[1]
+            if ffmpeg_major_version == 4:
+                assert_tensor_close_on_at_least(
+                    decoded, reference, percentage=95, atol=3
+                )
+            else:
+                torch.testing.assert_close(
+                    decoded, reference, **kwargs, atol=3, rtol=0
+                )
         else:
             torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
     else:

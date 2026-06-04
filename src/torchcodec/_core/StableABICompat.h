@@ -59,6 +59,7 @@ using StableDeviceGuard = torch::stable::accelerator::DeviceGuard;
 constexpr auto kStableCPU = torch::headeronly::DeviceType::CPU;
 constexpr auto kStableCUDA = torch::headeronly::DeviceType::CUDA;
 constexpr auto kStableXPU = torch::headeronly::DeviceType::XPU;
+constexpr auto kStableMLU = torch::headeronly::DeviceType::PrivateUse1;
 
 // Scalar type constants
 constexpr auto kStableUInt8 = torch::headeronly::ScalarType::Byte;
@@ -175,6 +176,8 @@ inline const char* deviceTypeName(StableDeviceType deviceType) {
       return "cuda";
     case kStableXPU:
       return "xpu";
+    case kStableMLU:
+      return "mlu";
     default:
       return "unknown";
   }
